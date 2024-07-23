@@ -27,18 +27,21 @@ class FileIntegrityCheckerApp:
         
         # Create UI elements
         self.add_file_button = tk.Button(self.root, text="Add File(s)", command= self.add_files)
-        self.add_file_button.grid(column = 0, padx=8, pady=8, sticky=tk.NE)
+        self.add_file_button.grid(column = 18, row = 0, padx=8, pady=8)
         
         self.add_folder_button = tk.Button(self.root, text="Add Folder(s)", command=self.add_folders)
-        self.add_folder_button.grid(column = 1, padx=8, pady=8, sticky=tk.NE)
+        self.add_folder_button.grid(column = 19, row = 0, padx=8, pady=8)
 
 
         #self.check_button_var = tk.StringVar(value="Check Integrity")
         self.check_button = tk.Button(self.root, text = "Check Integrity", command = self.check_integrity)
-        self.check_button.grid(row=1, column=1, pady=10)
+        self.check_button.grid(row=0, column=10, pady=10, columnspan= 2, rowspan= 2)
+
+        self.show_hash_button = tk.Button(self.root, text = "Show Hashes", command = self.show_hashes)
+        self.show_hash_button.grid(row=0, column=1, pady=10)
 
         self.result_text = tk.Text(self.root, height=40, width=160)
-        self.result_text.grid(row=2, column=0, columnspan=6, rowspan= 10, padx=10, pady=10)
+        self.result_text.grid(row=2, column=0, columnspan=20, rowspan= 10, padx=10, pady=10)
         
     def add_files(self):
         
@@ -99,28 +102,68 @@ class FileIntegrityCheckerApp:
             return None
     
     def check_integrity(self):
+        #creating tags for changing forground colors of the file names 
+        self.result_text.tag_configure("changed", foreground= "red")
+        self.result_text.tag_configure("not_changed", foreground= "green")
+        self.result_text.tag_configure("removed", foreground= "grey")
+        
+        #sorting files according to their integrity
+        changed = list()
+        removed = list()
+        not_changed = list()
+        
+        #clearing the older outputs
+        self.result_text.delete(1.0, tk.END)
+        
         if not self.files_to_check:
             tk.messagebox.showwarning("No Files Selected", "Please add files or folders first.")
             return
         
-        self.result_text.insert(tk.END, "Starting integrity check...\n")
+        self.result_text.insert(tk.END, "-"*158 + "\n")
+        self.result_text.insert(tk.END, f"{'INTEGRITY CHECK':^{158}}\n")
+        self.result_text.insert(tk.END, "-"*158 + "\n")
         
         for file_path in self.files_to_check:
             #checking if file_path in files_to_check is not in os.path, which means file is moved or deleted
             if not os.path.isfile(file_path):
-                self.result_text.insert(tk.END, f"Removed: {file_path}\n")
+                #self.result_text.insert(tk.END, f"Removed: {file_path}\n", "removed")
+                removed.append(file_path)
             
             #if file path is present in OS then checking if hash is same
             else:
                 #if hash is not same
                 if not self.check_hash(file_path):
-                    self.result_text.insert(tk.END, f"File Changed: {file_path}\n")
+                    #self.result_text.insert(tk.END, f"File Changed: {file_path}\n", "changed")
+                    changed.append(file_path)
                 
                 #if hash is same
                 else:
-                    self.result_text.insert(tk.END, f"no changes: {file_path}\n")
-                       
-        self.result_text.insert(tk.END, "Integrity check completed.\n\n")
+                    #self.result_text.insert(tk.END, f"no changes: {file_path}\n", "not_changed")
+                    not_changed.append(file_path)
+        
+        if changed:
+            changed.sort()
+            self.result_text.insert(tk.END, "CHANGED\n")            
+            for file_path in changed:
+                self.result_text.insert(tk.END, f"{file_path}\n", "changed")
+            self.result_text.insert(tk.END, "\n\n")
+        
+        if removed:
+            removed.sort()
+            self.result_text.insert(tk.END, "REMOVED\n")
+            for file_path in removed:
+                self.result_text.insert(tk.END, f"{file_path}\n", "removed")
+            self.result_text.insert(tk.END, "\n\n")
+        
+        if not_changed:
+            not_changed.sort()
+            self.result_text.insert(tk.END, "NO CHANGES\n")
+            for file_path in not_changed:
+                self.result_text.insert(tk.END, f"{file_path}\n", "not_changed")
+            self.result_text.insert(tk.END, "\n\n")
+                   
+        self.result_text.insert(tk.END, "-"*154 + "\n")    
+        self.result_text.insert(tk.END, f"{'Integrity Check Completed':^158}\n")
         
 
     #compute hash and add file to baseline_hashes
@@ -154,9 +197,22 @@ class FileIntegrityCheckerApp:
             return False
         
     def show_hashes(self):
-        for file_name, hashes in self.baseline_hashes.items():
-            print(f"{file_name}: {hashes}")
-
+        self.result_text.delete(1.0, tk.END)
+        self.result_text.tag_configure("oddRow", background= "white")
+        self.result_text.tag_configure("evenRow", background= "lightgrey")
+        self.result_text.insert(tk.END, f"{'Files':^{76}} {'Hashes':^{60}}\n")
+        self.result_text.insert(tk.END, "-"*154 + "\n")
+        row_alternator=0
+        for file_path, file_hash in self.baseline_hashes.items():
+            if row_alternator == 0:
+                self.result_text.insert(tk.END, "{:<76} {:<60}\n".format(file_path, file_hash), "evenRow")
+                row_alternator = 1
+            else:
+                self.result_text.insert(tk.END, "{:<76} {:<60}\n".format(file_path, file_hash), "oddRow")
+                row_alternator = 0
+        self.result_text.insert(tk.END, "\n\n")
+        
+        
     def add_folder_to_added_folders(self, folder):
         self.added_folders.add(folder)
 
