@@ -27,21 +27,29 @@ class FileIntegrityCheckerApp:
         
         # Create UI elements
         self.add_file_button = tk.Button(self.root, text="Add File(s)", command= self.add_files)
-        self.add_file_button.grid(column = 18, row = 0, padx=8, pady=8)
+        self.add_file_button.grid(column = 18, row = 0, pady=10)
         
         self.add_folder_button = tk.Button(self.root, text="Add Folder(s)", command=self.add_folders)
-        self.add_folder_button.grid(column = 19, row = 0, padx=8, pady=8)
+        self.add_folder_button.grid(column = 19, row = 0, pady=10)
 
 
         #self.check_button_var = tk.StringVar(value="Check Integrity")
         self.check_button = tk.Button(self.root, text = "Check Integrity", command = self.check_integrity)
         self.check_button.grid(row=0, column=10, pady=10, columnspan= 2, rowspan= 2)
 
+        #show hash button
         self.show_hash_button = tk.Button(self.root, text = "Show Hashes", command = self.show_hashes)
+        self.show_hash_button.grid(row=0, column=0, pady=10)
+        
+        #verify button
+        self.show_hash_button = tk.Button(self.root, text = "Verify Changes", command = self.verify_changes)
         self.show_hash_button.grid(row=0, column=1, pady=10)
 
+        
+        #result space
         self.result_text = tk.Text(self.root, height=40, width=160)
         self.result_text.grid(row=2, column=0, columnspan=20, rowspan= 10, padx=10, pady=10)
+        
         
     def add_files(self):
         
@@ -164,8 +172,37 @@ class FileIntegrityCheckerApp:
                    
         self.result_text.insert(tk.END, "-"*154 + "\n")    
         self.result_text.insert(tk.END, f"{'Integrity Check Completed':^158}\n")
+  
         
+    #creating checkbox group with select all option
+    def create_group(self, parent, label, options):
+        frame = tk.Frame(parent)
+        frame.pack(padx=10, pady=5, anchor="w")
+        
+        #adding selct all option
+        def select_all(group, var, checkboxes):
+            state = var.get()
+            for checkbox in checkboxes:
+                checkbox_var, checkbox_widget = checkbox
+                checkbox_var.set(state)
 
+        var_select_all = tk.IntVar()
+        select_all_checkbox = tk.Checkbutton(frame, text="Select All", variable=var_select_all, command=lambda: select_all(frame, var_select_all, checkboxes))
+        select_all_checkbox.pack(anchor="w")
+
+        checkboxes = []
+        for option in options:
+            var = tk.IntVar()
+            checkbox = tk.Checkbutton(frame, text=option, variable=var)
+            checkbox.pack(anchor="w")
+            checkboxes.append((var, checkbox))
+        
+        return frame
+    
+    #verify function
+    def verify_changes(self, files):
+        pass
+    
     #compute hash and add file to baseline_hashes
     def save_baseline(self, file_path):
         file_hash = self.compute_file_hash(file_path)
@@ -212,6 +249,12 @@ class FileIntegrityCheckerApp:
                 row_alternator = 0
         self.result_text.insert(tk.END, "\n\n")
         
+    
+    #verify_changes function 
+    def verify_changes(self):
+        #ToDo
+        pass
+    
         
     def add_folder_to_added_folders(self, folder):
         self.added_folders.add(folder)
