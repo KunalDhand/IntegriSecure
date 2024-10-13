@@ -1,6 +1,7 @@
 import hashlib
 import tkinter as tk
 from tkinter import filedialog
+from tkinter import messagebox
 import os
 import json
 
@@ -8,7 +9,7 @@ import json
 class FileIntegrityCheckerApp:
     def __init__(self, root):
         self.root = root
-        self.root.title("File Integrity Checker")
+        self.root.title("IntegriSecure")
                 
         # Initialize variables
         self.app_data_path = os.environ['APPDATA']
@@ -35,11 +36,11 @@ class FileIntegrityCheckerApp:
 
         #self.check_button_var = tk.StringVar(value="Check Integrity")
         self.check_button = tk.Button(self.root, text = "Check Integrity", command = self.check_integrity)
-        self.check_button.grid(row=0, column=10, pady=10, columnspan= 2, rowspan= 2)
+        self.check_button.grid(row=0, column=9, pady=10, columnspan= 2, rowspan= 2)
 
         #show hash button
         self.show_hash_button = tk.Button(self.root, text = "Show Hashes", command = self.show_hashes)
-        self.show_hash_button.grid(row=0, column=0, pady=10)
+        self.show_hash_button.grid(row=0, column=0, pady=10, padx=0)
         
         #verify button
         self.show_hash_button = tk.Button(self.root, text = "Verify Changes", command = self.verify_changes)
@@ -49,6 +50,12 @@ class FileIntegrityCheckerApp:
         #result space
         self.result_text = tk.Text(self.root, height=40, width=160)
         self.result_text.grid(row=2, column=0, columnspan=20, rowspan= 10, padx=10, pady=10)
+        self.result_text.insert(tk.END, "-"*160 + "\n")
+        self.result_text.insert(tk.END, f"{'IntegriSecure':^{162}}\n")
+        self.result_text.insert(tk.END, "-"*160 + "\n")
+    
+    def get_files_to_check(self):
+        return self.files_to_check
         
         
     def add_files(self):
@@ -112,12 +119,14 @@ class FileIntegrityCheckerApp:
     def check_integrity(self):
         #creating tags for changing forground colors of the file names 
         self.result_text.tag_configure("changed", foreground= "red")
-        self.result_text.tag_configure("not_changed", foreground= "green")
         self.result_text.tag_configure("removed", foreground= "grey")
+        self.result_text.tag_configure("renamed", foreground= "yellow")
+        self.result_text.tag_configure("not_changed", foreground= "green")
         
         #sorting files according to their integrity
         changed = list()
         removed = list()
+        renamed = list()
         not_changed = list()
         
         #clearing the older outputs
@@ -127,9 +136,9 @@ class FileIntegrityCheckerApp:
             tk.messagebox.showwarning("No Files Selected", "Please add files or folders first.")
             return
         
-        self.result_text.insert(tk.END, "-"*158 + "\n")
-        self.result_text.insert(tk.END, f"{'INTEGRITY CHECK':^{158}}\n")
-        self.result_text.insert(tk.END, "-"*158 + "\n")
+        self.result_text.insert(tk.END, "-"*160 + "\n")
+        self.result_text.insert(tk.END, f"{'INTEGRITY CHECK':^{162}}\n")
+        self.result_text.insert(tk.END, "-"*160 + "\n")
         
         for file_path in self.files_to_check:
             #checking if file_path in files_to_check is not in os.path, which means file is moved or deleted
@@ -170,39 +179,130 @@ class FileIntegrityCheckerApp:
                 self.result_text.insert(tk.END, f"{file_path}\n", "not_changed")
             self.result_text.insert(tk.END, "\n\n")
                    
-        self.result_text.insert(tk.END, "-"*154 + "\n")    
-        self.result_text.insert(tk.END, f"{'Integrity Check Completed':^158}\n")
+        self.result_text.insert(tk.END, "-"*158 + "\n")    
+        self.result_text.insert(tk.END, f"{'Integrity Check Completed':^162}\n")
   
-        
-    #creating checkbox group with select all option
-    def create_group(self, parent, label, options):
-        frame = tk.Frame(parent)
-        frame.pack(padx=10, pady=5, anchor="w")
-        
-        #adding selct all option
-        def select_all(group, var, checkboxes):
-            state = var.get()
-            for checkbox in checkboxes:
-                checkbox_var, checkbox_widget = checkbox
-                checkbox_var.set(state)
+    def select_items_from_lists(self, titles_and_elements):
+        selected_items = []
 
-        var_select_all = tk.IntVar()
-        select_all_checkbox = tk.Checkbutton(frame, text="Select All", variable=var_select_all, command=lambda: select_all(frame, var_select_all, checkboxes))
-        select_all_checkbox.pack(anchor="w")
+        def submit():
+            selected_items.clear()
+            for i, (title, check_vars) in enumerate(check_vars_list):
+                selected_list = []
+                for j, var in enumerate(check_vars):
+                    if var.get():
+                        selected_list.append(titles_and_elements[i][1][j])  # Append selected items from the list
+                selected_items.append((title, selected_list))  # Append the title and the selected items
+            #messagebox.showinfo("Selected Items", f"Selected items: {selected_items}")
+            
+            #updating baseline hash
+            for title, items in selected_items:
+                if title == "changed":
+                    for item in items:
+                        new_hash = self.compute_file_hash(item)
+                        self.update_baseline_hashes('change', item, new_hash=new_hash)
+                elif title == "removed":
+                    for item in items:
+                        self.update_baseline_hashes('remove', item)
+            
+            self.display_selected_items(selected_items)  # Display selected items
+            selection_window.destroy()  # Close the selection window
 
-        checkboxes = []
-        for option in options:
-            var = tk.IntVar()
-            checkbox = tk.Checkbutton(frame, text=option, variable=var)
-            checkbox.pack(anchor="w")
-            checkboxes.append((var, checkbox))
+        def toggle_select_all(check_vars, select_all_var):
+            """Toggle all checkboxes when 'Select All' is checked or unchecked."""
+            select_all_checked = select_all_var.get()
+            for var in check_vars:
+                var.set(select_all_checked)
+
+        # Create a new window for selection
+        selection_window = tk.Toplevel(self.root)
+        selection_window.title("Select Items")
+
+        # List to store check_vars for each list of elements
+        check_vars_list = []
+
+        # Loop through each title and its corresponding list of elements
+        for title, elements in titles_and_elements:
+            # Title Label for each list
+            tk.Label(selection_window, text=title, font=("Arial", 14)).pack(pady=10)
+
+            # Frame for each set of checkboxes
+            frame = tk.Frame(selection_window)
+            frame.pack(padx=20, pady=10)
+
+            # Create a list to hold IntVar objects for each checkbox
+            check_vars = []
+
+            # Add a "Select All" checkbox for each list
+            select_all_var = tk.IntVar()
+            select_all_checkbox = tk.Checkbutton(frame, text="Select All", variable=select_all_var, 
+                                                 command=lambda v=check_vars, sv=select_all_var: toggle_select_all(v, sv))
+            select_all_checkbox.pack(anchor="w")
+
+            # Dynamically create a checkbox for each element in the list
+            for element in elements:
+                var = tk.IntVar()
+                checkbox = tk.Checkbutton(frame, text=element, variable=var)
+                checkbox.pack(anchor="w")
+                check_vars.append(var)
+
+            # Append check_vars for the current list to the main check_vars_list
+            check_vars_list.append((title, check_vars))
+
+        # Submit button
+        submit_button = tk.Button(selection_window, text="Submit", command=submit)
+        submit_button.pack(pady=10)
         
-        return frame
+    def display_selected_items(self, selected_items):
+        """Display the selected items in the result text area."""
+        self.result_text.delete(1.0, tk.END)  # Clear previous results
+        self.result_text.insert(tk.END, "-" * 160 + "\n")
+        self.result_text.insert(tk.END, f"{'Selected Items':^{162}}\n")
+        self.result_text.insert(tk.END, "-" * 160 + "\n")
+
+        for title, items in selected_items:
+            self.result_text.insert(tk.END, f"{title}: {', '.join(items)}\n")
+            self.result_text.insert(tk.END, "-" * 160 + "\n")
     
-    #verify function
-    def verify_changes(self, files):
-        pass
-    
+
+    def verify_changes(self):
+        """Method to handle the Verify Changes button click."""
+        
+        #sorting files according to their integrity
+        changed = list()
+        removed = list()
+        not_changed = list()
+        
+        for file_path in self.files_to_check:
+            #checking if file_path in files_to_check is not in os.path, which means file is moved or deleted
+            if not os.path.isfile(file_path):
+                #self.result_text.insert(tk.END, f"Removed: {file_path}\n", "removed")
+                removed.append(file_path)
+            
+            #if file path is present in OS then checking if hash is same
+            else:
+                #if hash is not same
+                if not self.check_hash(file_path):
+                    #self.result_text.insert(tk.END, f"File Changed: {file_path}\n", "changed")
+                    changed.append(file_path)
+                
+                #if hash is same
+                else:
+                    #self.result_text.insert(tk.END, f"no changes: {file_path}\n", "not_changed")
+                    not_changed.append(file_path)
+                            
+        # Example data for verification (can be replaced with actual logic)
+        titles_and_elements = list()
+        if changed:
+            titles_and_elements.append(('changed', changed))
+        if removed:
+            titles_and_elements.append(('removed', removed))
+        
+        if titles_and_elements:
+            self.select_items_from_lists(titles_and_elements)
+        else:
+            messagebox.showinfo("Nothing to Verify", "There is no file change to verify.")
+        
     #compute hash and add file to baseline_hashes
     def save_baseline(self, file_path):
         file_hash = self.compute_file_hash(file_path)
@@ -212,8 +312,8 @@ class FileIntegrityCheckerApp:
         
         #creating dictionary to add in baseline_hashes file
         data = {normalise_file_path: file_hash}
-        self.update_baseline_hashes(data)
-        
+        self.append_to_baseline_hashes(data)
+                
         #adding to baseline_hashes dictionary for real time consistency
         self.baseline_hashes[normalise_file_path] = file_hash
         
@@ -248,12 +348,6 @@ class FileIntegrityCheckerApp:
                 self.result_text.insert(tk.END, "{:<76} {:<60}\n".format(file_path, file_hash), "oddRow")
                 row_alternator = 0
         self.result_text.insert(tk.END, "\n\n")
-        
-    
-    #verify_changes function 
-    def verify_changes(self):
-        #ToDo
-        pass
     
         
     def add_folder_to_added_folders(self, folder):
@@ -286,7 +380,7 @@ class FileIntegrityCheckerApp:
             
     
     #update data in baseline_hashes file
-    def update_baseline_hashes(self, data):
+    def append_to_baseline_hashes(self, data):
         """Updates the baseline_hashes file with the given data.
 
       Args:
@@ -329,6 +423,72 @@ class FileIntegrityCheckerApp:
         except json.JSONDecodeError:
             print(f"Error decoding JSON data in {self.baseline_file_path}")
             return {}
+
+    def update_baseline_hashes(self, operation, file_name, new_name=None, new_hash=None):
+        """
+        Update the baseline_hashes.json file.
+    
+        Args:
+            operation (str): The operation to perform ('remove', 'rename', 'change').
+            file_name (str): The name of the file to update.
+            new_name (str, optional): The new name for the file if renaming.
+            new_hash (str, optional): The new hash value for the file if changing the hash.
+    
+        Raises:
+            ValueError: If an invalid operation is provided.
+        """
+        try:
+            with open(self.baseline_file_path, 'r+') as f:
+                try:
+                    existing_data = json.load(f)
+                except json.JSONDecodeError:
+                    existing_data = {}
+    
+                if operation == 'remove':
+                    if file_name in existing_data:
+                        del existing_data[file_name]
+                        
+                        #remove file name from files_to_check list
+                        self.files_to_check.remove(file_name)
+                        print(f"Deleted {file_name} from baseline hashes.")
+                    else:
+                        print(f"{file_name} not found in baseline hashes.")
+                
+                elif operation == 'rename':
+                    if file_name in existing_data:
+                        if new_name is not None:
+                            existing_data[new_name] = existing_data.pop(file_name)
+                            print(f"Renamed {file_name} to {new_name}.")
+                        else:
+                            print("New name must be provided for renaming.")
+                    else:
+                        print(f"{file_name} not found in baseline hashes.")
+                
+                elif operation == 'change':
+                    if file_name in existing_data:
+                        if new_hash is not None:
+                            existing_data[file_name] = new_hash
+                            
+                            #update baseline_hash list too
+                            self.baseline_hashes[file_name] = new_hash
+                            print(f"Changed hash for {file_name}.")
+                        else:
+                            print("New hash value must be provided for changing hash.")
+                    else:
+                        print(f"{file_name} not found in baseline hashes.")
+                
+                else:
+                    raise ValueError("Invalid operation. Use 'delete', 'rename', or 'change'.")
+    
+                f.seek(0)
+                json.dump(existing_data, f, indent=4)
+                f.truncate()  # Ensure the file size is updated
+    
+        except FileNotFoundError:
+            print(f"Baseline file not found: {self.baseline_file_path}")
+        except OSError as e:
+            print(f"Error updating baseline hashes: {e}")
+
 
     def run(self):
             self.root.mainloop()
